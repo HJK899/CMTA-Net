@@ -1,0 +1,22 @@
+# ===== 原始数据与派生特征（可重生成，不入库）=====
+data/raw/
+data/features/
+
+# ===== 备份（本地保留）=====
+data/splits/_bak_v2/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ===== 预训练权重（可下载）与训练产物 =====
+*.pt
+!checkpoints/*.pt
+
+# ===== 日志/临时 =====
+*.log
+.DS_Store
+Thumbs.db

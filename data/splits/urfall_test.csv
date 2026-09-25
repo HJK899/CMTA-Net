@@ -1,0 +1,15 @@
+sample_id,dataset,subject,label,pose_path,physio_path,seg_points,channels
+urfall_adl-01,urfall,A01,0,data\features\pose\adl-01-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-01.npy,249,4
+urfall_adl-09,urfall,A09,0,data\features\pose\adl-09-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-09.npy,260,4
+urfall_adl-13,urfall,A13,0,data\features\pose\adl-13-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-13.npy,337,4
+urfall_adl-14,urfall,A14,0,data\features\pose\adl-14-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-14.npy,302,4
+urfall_adl-15,urfall,A15,0,data\features\pose\adl-15-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-15.npy,348,4
+urfall_adl-36,urfall,A36,0,data\features\pose\adl-36-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-36.npy,1544,4
+urfall_adl-37,urfall,A37,0,data\features\pose\adl-37-cam0.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\adl-37.npy,1541,4
+urfall_fall-04,urfall,F04,1,data\features\pose\fall-04-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-04.npy,117,4
+urfall_fall-06,urfall,F06,1,data\features\pose\fall-06-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-06.npy,128,4
+urfall_fall-08,urfall,F08,1,data\features\pose\fall-08-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-08.npy,115,4
+urfall_fall-10,urfall,F10,1,data\features\pose\fall-10-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-10.npy,116,4
+urfall_fall-14,urfall,F14,1,data\features\pose\fall-14-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-14.npy,140,4
+urfall_fall-26,urfall,F26,1,data\features\pose\fall-26-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-26.npy,196,4
+urfall_fall-27,urfall,F27,1,data\features\pose\fall-27-cam1.npy,C:\Users\H\Desktop\算法模型\data\features\physio\urfall\fall-27.npy,289,4
