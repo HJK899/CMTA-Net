@@ -11,15 +11,15 @@
 - 增强版 3D 骨架（Zenodo，可选加分）：https://zenodo.org/records/12773013
 - 许可：公开数据集，研究用途免费；申报材料注明出处（UP-Fall Detection Dataset, Martinez-Villaseñor et al.）
 
-## 2. PPG-DaLiA（生理支路：PPG/加速度/ECG/呼吸）⬇️ 下载中（Kaggle 镜像）
+## 2. PPG-DaLiA（生理支路：PPG/加速度/ECG/呼吸）✅ 已就位（窗口化镜像）
 
 - 内容：15 名受试者、每人约 2.5 小时日常活动；腕戴 Empatica E4（PPG 64Hz、加速度 32Hz）+
   胸戴 RespiBAN（ECG/呼吸 700Hz），含心率真值。
-- 下载源（推荐，速度约 2MB/s）：https://www.kaggle.com/api/v1/datasets/download/aiforiot/ppg-dalia
-  - 原始包约 3.1GB；解压后含 15 个受试者目录，每人 2 个记录（sitting/working/typing/walking/lying
-    等 8 类活动标注）。
-  - ⚠ UCI 官方直链 https://archive.ics.uci.edu/static/public/495/ppg+dalia.zip 实测 200KB/s、
-    需 4-5 小时，不推荐（已弃用）。
+- 已下载（窗口化镜像 65MB → 解压 338MB）：`data/raw/ppg_dalia/dalia_window/combined_data.csv`
+  （约 495 万条 8 秒窗口，wrist_BVP/心率回归标签/patient_id；当前镜像含 1 名受试者 S1）
+- 下载源（窗口化，速度快）：https://www.kaggle.com/api/v1/datasets/download/aiforiot/ppg-dalia
+  - 原始包约 3.1GB（15 受试者），⚠ UCI 官方直链 200KB/s、Kaggle 大文件限速 85KB/s，
+    实测需 4-8 小时，已放弃（本作品以窗口化镜像作为 PPG→心率附加素材，不阻塞主线）。
 - 放置目录：`data/raw/ppg_dalia/`
 - 许可：研究用途免费，注明出处（Reiss et al., "Deep PPG: Large-Scale Heart Rate Estimation with Convolutional Neural Networks", Sensors 2019, 19(14), 3079, DOI: 10.3390/s19143079）
 
