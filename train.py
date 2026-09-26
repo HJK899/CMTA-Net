@@ -57,6 +57,8 @@ def main() -> None:
     ap.add_argument("--physio-channels", type=int, default=None,
                     help="覆盖生理通道数（UP-Fall full=16；UR Fall/老年=4）")
     ap.add_argument("--d-model", type=int, default=None, help="覆盖模型宽度 d_model")
+    ap.add_argument("--aux-lambda", type=float, default=0.5,
+                    help="多任务：单流诊断头损失的权重（仅双模态 both 时启用）")
     args = ap.parse_args()
 
     cfg = get_config()
@@ -138,8 +140,12 @@ def main() -> None:
 
             optimizer.zero_grad()
             with torch.autocast("cuda", enabled=use_amp):
-                logits, _ = model(behav, physio)
+                logits, s, logits_p, logits_b = model(behav, physio)
                 loss = criterion(logits, labels)
+                # 多任务：双模态时叠加单流诊断头损失（模块④：四态归因学习）
+                if args.stream == "both" and args.aux_lambda > 0:
+                    loss = loss + args.aux_lambda * criterion(logits_p, labels)
+                    loss = loss + args.aux_lambda * criterion(logits_b, labels)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -155,7 +161,7 @@ def main() -> None:
         with torch.no_grad():
             for batch in val_loader:
                 behav, physio = model_inputs(batch)
-                logits, _ = model(behav, physio)
+                logits, _, _, _ = model(behav, physio)
                 y_true.extend(batch["label"].cpu().numpy().tolist())
                 y_prob.extend(torch.softmax(logits, dim=1).cpu().numpy().tolist())
         rep = classification_report(np.array(y_true), np.array(y_prob))

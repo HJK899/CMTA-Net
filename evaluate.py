@@ -52,7 +52,7 @@ def main() -> None:
         num_classes=num_classes, num_gru_layers=m.num_gru_layers,
         attn_temperature=m.attn_temperature, dropout=m.dropout,
     )
-    model.load_state_dict(ckpt["model"])
+    model.load_state_dict(ckpt["model"], strict=False)   # 兼容旧版 checkpoint（无单流诊断头）
     model.to(device).eval()
     print(f"[model] 已加载 {ckpt_path}（epoch {ckpt['config']['epochs']}）")
 
@@ -61,19 +61,27 @@ def main() -> None:
                         num_workers=0, collate_fn=collate)
 
     y_true, y_prob, s_scores = [], [], []
+    y_prob_p, y_prob_b = [], []          # 单流诊断头（模块④四态）
+    has_heads = "physio_head.weight" in ckpt["model"]
+    if has_heads:
+        print("[model] 检测到单流诊断头 → 启用四态输出评估")
     with torch.no_grad():
         for batch in loader:
             behav = batch["behavior"].to(device) if "behavior" in batch and args.stream in ("both", "behavior") else None
             physio = batch["physio"].to(device) if "physio" in batch and args.stream in ("both", "physio") else None
-            logits, s = model(behav, physio)
+            out = model(behav, physio)
+            logits, s = out[0], out[1]
             y_true.extend(batch["label"].cpu().numpy().tolist())
             y_prob.extend(torch.softmax(logits, dim=1).cpu().numpy().tolist())
             if s is not None:
                 s_scores.extend(s.cpu().numpy().tolist())
+            if has_heads and args.stream == "both" and out[2] is not None:
+                y_prob_p.extend(torch.softmax(out[2], dim=1).cpu().numpy().tolist())
+                y_prob_b.extend(torch.softmax(out[3], dim=1).cpu().numpy().tolist())
 
     y_true, y_prob = np.array(y_true), np.array(y_prob)
     rep = classification_report(y_true, y_prob)
-    print("\n===== 测试集指标 =====")
+    print("\n===== 测试集指标（融合头） =====")
     print(f"混淆矩阵: TP={rep['confusion']['tp']} FP={rep['confusion']['fp']} "
           f"FN={rep['confusion']['fn']} TN={rep['confusion']['tn']}")
     print(f"准确率  = {rep['accuracy']:.4f}")
@@ -88,6 +96,42 @@ def main() -> None:
               f"(正常样本 {s_arr[y_true == 0].mean():.3f} vs 异常样本 {s_arr[y_true == 1].mean():.3f})")
     else:
         print("模态一致性 s: 单流模式不计算")
+
+    # 模块④：四态联合诊断评估（仅双模态 + 有单流头时）
+    if has_heads and args.stream == "both" and len(y_prob_p) == len(y_true):
+        from sklearn.metrics import roc_curve
+        from utils.metrics import four_state_report
+        y_prob_p_a, y_prob_b_a = np.array(y_prob_p), np.array(y_prob_b)
+        # 单流头阈值由验证集 Youden 指数校准（避免固定0.5的未校准偏移）
+        tau_p, tau_b = 0.5, 0.5
+        try:
+            vds = CMTA_Dataset("val", cfg, dataset=args.dataset, mode="both", augment=False)
+            vloader = DataLoader(vds, batch_size=cfg.train.batch_size, shuffle=False,
+                                 num_workers=0, collate_fn=collate)
+            v_p, v_b, v_t = [], [], []
+            with torch.no_grad():
+                for batch in vloader:
+                    vb = batch["behavior"].to(device)
+                    vp = batch["physio"].to(device)
+                    out = model(vb, vp)
+                    v_t.extend(batch["label"].cpu().numpy().tolist())
+                    v_p.extend(torch.softmax(out[2], dim=1).cpu().numpy().tolist())
+                    v_b.extend(torch.softmax(out[3], dim=1).cpu().numpy().tolist())
+            _, _, ths_p = roc_curve(v_t, np.array(v_p)[:, 1])
+            _, _, ths_b = roc_curve(v_t, np.array(v_b)[:, 1])
+            fpr_p, tpr_p, _ = roc_curve(v_t, np.array(v_p)[:, 1])
+            fpr_b, tpr_b, _ = roc_curve(v_t, np.array(v_b)[:, 1])
+            tau_p = float(ths_p[np.argmax(tpr_p - fpr_p)])
+            tau_b = float(ths_b[np.argmax(tpr_b - fpr_b)])
+        except Exception as e:
+            print(f"  [warn] 验证集阈值校准失败，回退 0.5: {e}")
+        print(f"  [四态] 校准阈值: 生理={tau_p:.3f} / 行为={tau_b:.3f}（验证集 Youden）")
+        f4 = four_state_report(np.array(y_true), y_prob_p_a, y_prob_b_a,
+                               np.array(s_scores) if s_scores else None,
+                               tau_p=tau_p, tau_b=tau_b)
+        print("\n===== 四态联合诊断（模块④） =====")
+        for line in f4["lines"]:
+            print(line)
 
     out_prefix = str(Path(args.out))
     ok = save_figures(y_true, y_prob, out_prefix)

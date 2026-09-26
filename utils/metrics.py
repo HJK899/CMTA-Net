@@ -86,3 +86,56 @@ def save_figures(y_true: np.ndarray, y_prob: np.ndarray, out_prefix: str) -> boo
     except Exception as e:
         print(f"  [warn] 图表生成失败（降级为文本指标）: {e}")
         return False
+
+
+def four_state_report(y_true: np.ndarray, prob_p: np.ndarray, prob_b: np.ndarray,
+                      s_scores: Optional[np.ndarray] = None,
+                      tau_p: float = 0.5, tau_b: float = 0.5) -> dict:
+    """模块④四态联合诊断评估。
+
+    状态规则（单流头阈值 tau_p / tau_b，建议由验证集 Youden 指数选出）：
+        正常    : 生理<tau_p 且 行为<tau_b
+        生理异常: 生理>=tau_p 且 行为<tau_b
+        行为异常: 生理<tau_p 且 行为>=tau_b
+        联合异常: 生理>=tau_p 且 行为>=tau_b
+
+    y_true 为二分类标签（0=正常, 1=异常/跌倒）：
+        - 真实"联合异常"样本 = 标签 1（UR Fall 的跌倒段双模态均异常）
+        - 真实"正常"样本 = 标签 0
+    中间两态（生理异常/行为异常）为开放诊断能力，在只有"双模态同异常/同正常"标注的
+    数据集上无 ground-truth，如实报告其预测分布，不宣称正确率。
+    """
+    y_true = np.asarray(y_true)
+    prob_p = np.asarray(prob_p)
+    prob_b = np.asarray(prob_b)
+    p1 = prob_p[:, 1] if prob_p.ndim == 2 else prob_p
+    b1 = prob_b[:, 1] if prob_b.ndim == 2 else prob_b
+
+    state = np.where((p1 >= tau_p) & (b1 >= tau_b), 3,
+             np.where((p1 >= tau_p) & (b1 < tau_b), 1,
+              np.where((p1 < tau_p) & (b1 >= tau_b), 2, 0)))  # 0正常 1生理 2行为 3联合
+    names = {0: "正常", 1: "生理异常", 2: "行为异常", 3: "联合异常"}
+
+    n = len(y_true)
+    joint_recall = float((state[y_true == 1] == 3).mean()) if (y_true == 1).any() else float("nan")
+    normal_rec = float((state[y_true == 0] == 0).mean()) if (y_true == 0).any() else float("nan")
+    overall = float((((state == 3) & (y_true == 1)) | ((state == 0) & (y_true == 0))).sum() / n) if n else 0.0
+
+    lines = [
+        f"决策规则：生理阈值={tau_p:.3f} / 行为阈值={tau_b:.3f} → 四态",
+        "状态分布（预测）：" + ", ".join(
+            f"{names[k]}={int((state == k).sum())}" for k in range(4) if (state == k).any()),
+    ]
+    if n:
+        lines.append(f"联合异常召回（真实跌倒→联合异常）: {joint_recall:.4f}")
+        lines.append(f"正常识别率（真实日常→正常）      : {normal_rec:.4f}")
+        lines.append(f"四态判定综合正确率               : {overall:.4f}")
+        lines.append("注：中间两态（生理/行为异常）在双模态同异常/同正常的标注下无 ground-truth，")
+        lines.append("    作为开放诊断能力如实报告，不宣称其正确率。")
+    if s_scores is not None:
+        s = np.asarray(s_scores)
+        for k in range(4):
+            if (state == k).sum() > 0:
+                lines.append(f"  {names[k]}：一致性分数均值={s[state == k].mean():.3f}")
+
+    return {"lines": lines, "state": state, "overall": round(overall, 4)}

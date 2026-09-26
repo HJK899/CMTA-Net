@@ -63,7 +63,10 @@ python train.py --dataset upfall --stream physio --physio-channels 16 --epochs 6
 python evaluate.py --checkpoint checkpoints/best_upfall_v2.pt --dataset upfall --stream physio --split test --out outputs/eval_upfall
 
 # 7) 推理时延/参数量评测（边缘部署论证）
-python benchmark_latency.py --checkpoint checkpoints/best_upfall_v2.pt
+python benchmark_latency.py --checkpoint checkpoints/best_upfall_v2h.pt
+
+# 8) 端到端推理接口（模块④四态诊断 + 可解释输出）
+python inference.py --checkpoint checkpoints/best_urfall_v2mt.pt
 ```
 
 ## 数据集主线（全部开源，9/25 已全部落地）
@@ -87,18 +90,21 @@ python benchmark_latency.py --checkpoint checkpoints/best_upfall_v2.pt
 
 **主实验：CMTA-Net 传感流（UP-Fall，按受试者 6:2:2，132 个未见受试者测试样本）**
 
-V2 = 多部位融合（16通道：EEG + 5处穿戴加速度15通道）；V1 = 4通道（EEG+腕戴acc3）。
+V2h = 多部位融合 + 单流诊断头（16通道：EEG + 5处穿戴加速度15通道，当前主模型）；
+V2 = 旧结构（仅融合头，16通道）；V1 = 4通道（EEG+腕戴acc3）。
 
-| 版本 | F1（3 seed） | F1 均值±std | AUC 均值±std | 异常召回率(seed1) |
-|---|---|---|---|---|
-| V2（16通道） | 0.9217 / 0.9194 / 0.9134 | **0.9182 ± 0.004** | **0.9793 ± 0.001** | 0.8833 |
-| V1（4通道，基线） | 0.8750 / 0.8376 / 0.8421 | 0.8516 ± 0.021 | 0.9282 ± 0.009 | 0.9333 |
+| 版本 | F1（3 seed） | F1 均值±std | AUC 均值±std |
+|---|---|---|---|
+| V2h（新结构，当前主模型） | 0.9310 / 0.9508 / 0.9298 | **0.9372 ± 0.011** | **0.9842 ± 0.002** |
+| V2（旧结构） | 0.9217 / 0.9194 / 0.9134 | 0.9182 ± 0.004 | 0.9793 ± 0.001 |
+| V1（4通道，基线） | 0.8750 / 0.8376 / 0.8421 | 0.8516 ± 0.021 | 0.9282 ± 0.009 |
 
 **配置敏感性（UP-Fall，3 seed）**
 
 | 配置 | F1 均值±std | AUC 均值±std | 结论 |
 |---|---|---|---|
-| V2 16通道（当前默认） | **0.9182 ± 0.004** | **0.9793 ± 0.001** | 甜点 |
+| V2h 16通道+诊断头（当前默认） | **0.9372 ± 0.011** | **0.9842 ± 0.002** | 最优 |
+| V2 16通道（旧结构） | 0.9182 ± 0.004 | 0.9793 ± 0.001 | 结构对照 |
 | V2 + 数据增强（时间扭曲+噪声） | 0.9173 ± 0.004 | 0.9810 ± 0.002 | F1 持平、AUC 微升 → 配置已近饱和 |
 | V3 31通道（16+5处角速度15） | 0.8966（seed1） | 0.956（seed1） | 角速度冗余 → 退化，弃用 |
 | d_model=192 | 0.9206（seed1） | 0.9711（seed1） | 与128相当，保持128 |
@@ -119,6 +125,27 @@ V2 = 多部位融合（16通道：EEG + 5处穿戴加速度15通道）；V1 = 4�
 | CMTA-Net 双模态（传感+骨架） | 1.0000 / 1.0000 / 1.0000 | 1.0 | 跨模态互证融合 |
 | 仅传感（physio-only，消融） | 0.9333 | 0.9796 | 消融：去掉行为流 |
 | 仅行为（behavior-only，消融） | 1.0000 | 1.0 | 消融：去掉生理流 |
+
+**模块④：四态联合诊断（正常/生理异常/行为异常/联合异常）**
+
+机制：融合头给出联合异常判断；单流诊断头（physio_head/behavior_head，多任务训练）做模态归因；
+双阈值（验证集 Youden 校准）组合成四态；同时输出模态一致性分数 s 供复核。
+
+- **UR Fall 双模态（3 seed）**：融合头 F1 全 1.0；正常态识别率 3 seed 全 1.000（日常→正常）；
+  联合异常召回 0.14~0.29（真实跌倒部分被归为"行为异常"）——根因是 UR Fall 加速度生理信号
+  fall/adl 可分性弱（生理头 AUC≈0.86、概率贴近0.5），如实定位为数据局限而非机制缺陷。
+- **UP-Fall 传感流（"生理异常"态验证）**：physio_head 16 通道 F1=0.937±0.011 / AUC=0.984±0.002，
+  证明"生理异常"态在主数据上判别力强。
+- 结论：四态归因能力已完整实现——行为异常（UR Fall 行为头 AUC=1.0）+ 生理异常（UP-Fall 生理头
+  AUC=0.984）+ 正常（100%）+ 联合异常（两模态强判别时）；中间两态在"双模态同异常/同正常"标注的
+  数据集上无 ground-truth，如实报告为开放诊断能力。
+
+推理接口（演示/部署用）：
+
+```bash
+python inference.py --checkpoint checkpoints/best_urfall_v2mt.pt   # 双模态四态冒烟
+python inference.py --checkpoint checkpoints/best_upfall_v2h.pt    # 传感流（生理异常）冒烟
+```
 
 **老年腕戴（真实老人+心率，41人）**：测试 AUC≈0.54——该数据集模拟跌倒标注噪声大、fall/adl 可分性弱（线性与深度方法均≈0.55），作为"真实老人数据获取/处理能力 + 跨域挑战"定位，不作为性能证据。
 

@@ -60,9 +60,15 @@ class CMTA_Net(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(d_model, num_classes),
         )
+        # 模块④四态决策：单流诊断头（生理/行为各自独立异常预测）
+        # 融合头 → 联合判断；单流头 → 模态归因（生理异常/行为异常/联合异常/正常）
+        self.physio_head = nn.Linear(d_model, num_classes)
+        self.behavior_head = nn.Linear(d_model, num_classes)
 
     def forward(self, behavior: torch.Tensor | None, physio: torch.Tensor | None):
-        """behavior: (B,Tb,K*3); physio: (B,C,Tp) → logits, s
+        """behavior: (B,Tb,K*3); physio: (B,C,Tp) → (logits, s, logits_p, logits_b)
+        - 双模态：logits=融合头；logits_p/logits_b=单流诊断头；s=一致性分数
+        - 单流  ：logits=对应单流头输出；其余为 None
         支持单流：behavior=None 时仅生理流；physio=None 时仅行为流。
         """
         if behavior is None and physio is None:
@@ -71,20 +77,22 @@ class CMTA_Net(nn.Module):
         if behavior is None:
             h_p = self.physio_branch(physio)                # (B,Tp,d)
             z = h_p.mean(dim=1)
-            return self.classifier(z), None
+            return self.physio_head(z), None, None, None
 
         if physio is None:
             h_b = self.behavior_branch(behavior)            # (B,Tb,d)
             z = h_b.mean(dim=1)
-            return self.classifier(z), None
+            return self.behavior_head(z), None, None, None
 
         h_b = self.behavior_branch(behavior)            # (B,Tb,d)
         h_p = self.physio_branch(physio)                # (B,Tp,d)
         h_p = self.align(h_p, h_b.size(1))              # 上采样到 Tb（模块①）
         z, s = self.fusion(h_b, h_p)                    # (B,Tb,d), (B,)
         z = z.mean(dim=1)                               # 全局平均池化 → (B,d)
-        logits = self.classifier(z)                     # (B,num_classes)
-        return logits, s
+        logits = self.classifier(z)                     # (B,num_classes) 融合头
+        logits_p = self.physio_head(h_p.mean(dim=1))    # 生理单流诊断头
+        logits_b = self.behavior_head(h_b.mean(dim=1))  # 行为单流诊断头
+        return logits, s, logits_p, logits_b
 
 
 if __name__ == "__main__":
@@ -92,7 +100,12 @@ if __name__ == "__main__":
     # 模拟真实异质长度：行为 150 帧 @30fps，生理 5 点 @1Hz
     behavior = torch.randn(4, 150, 17 * 3)
     physio = torch.randn(4, 4, 5)
-    logits, s = net(behavior, physio)
-    print("CMTA_Net logits:", tuple(logits.shape), "一致性:", tuple(s.shape))
+    logits, s, logits_p, logits_b = net(behavior, physio)
+    print("CMTA_Net logits:", tuple(logits.shape), "一致性:", tuple(s.shape),
+          "生理头:", tuple(logits_p.shape), "行为头:", tuple(logits_b.shape))
+    # 单流测试
+    lp, *_ = net(None, physio)
+    lb, *_ = net(behavior, None)
+    print("单流生理头:", tuple(lp.shape), "单流行为头:", tuple(lb.shape))
     n_params = sum(p.numel() for p in net.parameters())
     print(f"参数量: {n_params / 1e6:.2f}M")
