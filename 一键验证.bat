@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title CMTA-Net 一键验证
+title CMTA-Net 可视化验证平台
 cd /d "C:\Users\H\Desktop\算法模型"
-"D:\PyTorch\venv\Scripts\python.exe" run_verify.py
+"D:\PyTorch\venv\Scripts\python.exe" gui_verify.py
 pause
