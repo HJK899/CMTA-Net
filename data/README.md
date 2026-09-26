@@ -39,6 +39,17 @@
 - 下载源：https://fenix.ur.edu.pl/mkepski/ds/uf.html （页面 140 个直链并发下载）
 - 许可：研究用途免费，注明出处（Kwolek & Kepski, 2014）
 
+## 5. 跨库泛化测试素材（非训练集视频）✅ 已就位
+
+- 内容：Kaggle unidpro/fall-detection（页面称 10,000 视频，实际压缩包含 2 个高清示例视频
+  sample_1/sample_2.mp4，1080×1920@30fps，户外冬季场景跌倒）；**与训练集（UR Fall 室内）完全无关**，
+  用作跨库泛化测试素材（照片序列形式）。
+- 已抽帧：`outputs/demo_photos_cross/fall/`（8帧，弯腰跑动段）、`lying/`（8帧，趴地静态段）
+- 下载源：https://www.kaggle.com/api/v1/datasets/download/unidpro/fall-detection （47.1MB）
+- 实测（如实）：户外跌倒段概率 0.687（室内校准阈值 0.76 下漏检）、趴地段 0.861 →
+  **跨域分布漂移**，属"局限与未来工作：域自适应"素材，不作为性能证据。
+- 引用注意：unidpro 示例视频具体拍摄来源页面未注明，申报时标注"Kaggle Fall Detection 示例视频（unidpro）"即可。
+
 ## 备选（不阻塞主线，周期不可控）
 
 ## 目录约定
