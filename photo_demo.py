@@ -39,8 +39,14 @@ IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def extract_pose(model, img_path: str):
-    """单张照片 → (17,3) 归一化骨架；无人返回 None。"""
-    res = model.predict(str(img_path), verbose=False, device="cpu")[0]
+    """单张照片 → (17,3) 归一化骨架；无人返回 None。
+
+    用 PIL 读取以兼容中文路径（cv2.imread 不支持非 ASCII 路径）。
+    """
+    from PIL import Image
+    img = Image.open(img_path).convert("RGB")
+    arr = np.asarray(img)[:, :, ::-1].copy()   # RGB → BGR（YOLO 期望 BGR）
+    res = model.predict(arr, verbose=False, device="cpu")[0]
     kps = res.keypoints
     if kps is None or len(kps.data) == 0:
         return None
