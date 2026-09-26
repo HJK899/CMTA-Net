@@ -70,7 +70,15 @@ TASKS = {
                  ["photo_demo.py", "-d", "outputs/demo_photos/adl",
                   "--out", "outputs/demo_photo_adl.png"]],
     },
+    "7": {
+        "name": "测试我的照片",
+        "desc": "判定「我的测试照片」文件夹中的照片序列",
+        "cmds": [["photo_demo.py", "-d", "我的测试照片",
+                  "--out", "outputs/demo_my_photos.png"]],
+    },
 }
+
+MY_PHOTOS_DIR = os.path.join(BASE, "我的测试照片")
 
 RE_METRICS = {
     "acc": re.compile(r"准确率\s*=\s*([\d.]+)"),
@@ -177,6 +185,8 @@ class App:
         self.start_btn.pack(side="left", padx=(0, 6))
         self.stop_btn = ttk.Button(btn_row, text="■ 停止", command=self.stop, state="disabled")
         self.stop_btn.pack(side="left")
+        self.open_btn = ttk.Button(btn_row, text="📁 打开照片文件夹", command=self._open_photos_dir)
+        self.open_btn.pack(side="left", padx=(10, 0))
 
         self.status = ttk.Label(left, text="就绪", font=("Microsoft YaHei UI", 9),
                                 foreground="#57606a", background="#f4f6fa")
@@ -220,6 +230,15 @@ class App:
 
     def _on_task_change(self):
         pass
+
+    def _open_photos_dir(self):
+        """打开「我的测试照片」文件夹（Windows 资源管理器）。"""
+        try:
+            os.makedirs(MY_PHOTOS_DIR, exist_ok=True)
+            os.startfile(MY_PHOTOS_DIR)  # type: ignore[attr-defined]
+            self._append_log("[打开] 已打开「我的测试照片」文件夹，把照片放进去后选任务7")
+        except Exception as e:  # noqa: BLE001
+            self._append_log(f"[打开] 失败: {e}")
 
     def _append_log(self, text):
         self.log.insert("end", text + "\n")
@@ -266,6 +285,23 @@ class App:
                 self.status.config(text="完成 ✔ 跌倒异常 vs 日常正常", foreground="#1a7f37")
             else:
                 self.status.config(text="完成（照片判定，请查看日志）", foreground="#9a6700")
+        elif self.task_var.get() == "7":
+            # 我的照片任务：解析行为异常概率 + 判定结论
+            probs = RE_METRICS["probe"].findall(text)
+            verdict = re.search(r"判定：([^\n]+)", text)
+            if probs:
+                self.metric_names["acc"].config(text="行为异常概率")
+                self.metric_labels["acc"].config(text=f"{float(probs[0]):.3f}",
+                                                 font=("Microsoft YaHei UI", 18, "bold"))
+                v = verdict.group(1).strip() if verdict else "—"
+                self.metric_names["f1"].config(text="判定结果")
+                self.metric_labels["f1"].config(text=v[:8], font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_names["auc"].config(text="判定阈值")
+                self.metric_labels["auc"].config(text="0.76", font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_labels["cm"].config(text="异常>0.76", font=("Microsoft YaHei UI", 14, "bold"))
+                self.status.config(text="完成 ✔ 照片判定", foreground="#1a7f37")
+            else:
+                self.status.config(text="完成（未检测到照片或无人，请查看日志）", foreground="#9a6700")
         else:
             parsed = self._parse_metrics(text)
             if parsed:
