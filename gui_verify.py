@@ -89,10 +89,12 @@ class Worker(threading.Thread):
                 break
             self.on_line(f"\n════ 步骤 {i+1}/{len(self.cmds)}：{' '.join(cmd[:2])} ════\n")
             try:
+                env = dict(os.environ)
+                env["PYTHONIOENCODING"] = "utf-8"
                 p = subprocess.Popen([PY] + cmd, cwd=BASE,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                      encoding="utf-8", errors="replace",
-                                     bufsize=1, text=True)
+                                     bufsize=1, text=True, env=env)
                 for line in p.stdout:
                     if self._stop.is_set():
                         p.kill()
@@ -171,7 +173,7 @@ class App:
         right = ttk.Frame(top); right.pack(side="left", fill="both", expand=True, padx=(16, 0))
         ttk.Label(right, text="运行日志", font=("Microsoft YaHei UI", 11, "bold"),
                   background="#f4f6fa").pack(anchor="w", pady=(0, 4))
-        self.log = tk.Text(right, height=16, width=58, font=("Consolas", 9),
+        self.log = tk.Text(right, height=16, width=58, font=("Microsoft YaHei UI", 9),
                            bg="#0d1117", fg="#c9d1d9", relief="flat", wrap="none")
         self.log.pack(fill="both", expand=True)
         self.log.insert("end", "就绪。选择左侧任务后点击「开始验证」。\n")

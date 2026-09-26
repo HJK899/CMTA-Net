@@ -18,7 +18,9 @@ PY = sys.executable
 
 def run(cmd: list, desc: str):
     print(f"\n▶▶▶ {desc}")
-    r = subprocess.run([PY] + cmd, cwd=BASE)
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    r = subprocess.run([PY] + cmd, cwd=BASE, env=env)
     if r.returncode != 0:
         print(f"⚠ 执行失败（exit={r.returncode}），请检查上方报错。")
     return r.returncode
