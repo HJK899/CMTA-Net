@@ -286,10 +286,24 @@ class App:
             else:
                 self.status.config(text="完成（照片判定，请查看日志）", foreground="#9a6700")
         elif self.task_var.get() == "7":
-            # 我的照片任务：解析行为异常概率 + 判定结论
+            # 我的照片任务：单组→概率+判定；多组→各组概率+组数
             probs = RE_METRICS["probe"].findall(text)
             verdict = re.search(r"判定：([^\n]+)", text)
-            if probs:
+            n_groups = text.count("—— 组「")   # 每组判定标题出现1次
+            if n_groups == 0:
+                n_groups = 1                     # 单组模式（无组标题）
+            if probs and n_groups >= 2:
+                self.metric_names["acc"].config(text="第1组概率")
+                self.metric_labels["acc"].config(text=f"{float(probs[0]):.3f}",
+                                                 font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_names["f1"].config(text="第2组概率")
+                self.metric_labels["f1"].config(text=f"{float(probs[1]):.3f}",
+                                               font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_names["auc"].config(text="判定阈值")
+                self.metric_labels["auc"].config(text="0.76", font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_labels["cm"].config(text=f"共{n_groups}组", font=("Microsoft YaHei UI", 14, "bold"))
+                self.status.config(text=f"完成 ✔ 共{n_groups}组（日志见汇总）", foreground="#1a7f37")
+            elif probs:
                 self.metric_names["acc"].config(text="行为异常概率")
                 self.metric_labels["acc"].config(text=f"{float(probs[0]):.3f}",
                                                  font=("Microsoft YaHei UI", 18, "bold"))
@@ -347,7 +361,8 @@ class App:
         if os.path.isdir(out_dir):
             for f in sorted(os.listdir(out_dir)):
                 if f.endswith("_cm.png") or f.endswith("_roc.png") \
-                        or f.startswith("demo_photo") or f == "photo_demo.png":
+                        or f.startswith("demo_photo") or f == "photo_demo.png" \
+                        or f.startswith("demo_group"):
                     cands.append(os.path.join(out_dir, f))
         cands.sort(key=lambda p: os.path.getmtime(p), reverse=True)
         if not cands:
