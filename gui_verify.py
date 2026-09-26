@@ -76,6 +76,11 @@ TASKS = {
         "cmds": [["photo_demo.py", "-d", "我的测试照片",
                   "--out", "outputs/demo_my_photos.png"]],
     },
+    "8": {
+        "name": "视频检测演示（跨库户外）",
+        "desc": "户外跌倒视频直接检测（150帧真实时序）",
+        "cmds": [["photo_demo.py", "--video", "data/raw/fall10k/extracted/sample_1.mp4"]],
+    },
 }
 
 MY_PHOTOS_DIR = os.path.join(BASE, "我的测试照片")
@@ -285,8 +290,8 @@ class App:
                 self.status.config(text="完成 ✔ 跌倒异常 vs 日常正常", foreground="#1a7f37")
             else:
                 self.status.config(text="完成（照片判定，请查看日志）", foreground="#9a6700")
-        elif self.task_var.get() == "7":
-            # 我的照片任务：单组→概率+判定；多组→各组概率+组数
+        elif self.task_var.get() in ("7", "8"):
+            # 我的照片/视频任务：单组→概率+判定；多组（任务7）→各组概率+组数
             probs = RE_METRICS["probe"].findall(text)
             verdict = re.search(r"判定：([^\n]+)", text)
             n_groups = text.count("—— 组「")   # 每组判定标题出现1次

@@ -67,6 +67,11 @@ python benchmark_latency.py --checkpoint checkpoints/best_upfall_v2h.pt
 
 # 8) 端到端推理接口（模块④四态诊断 + 可解释输出）
 python inference.py --checkpoint checkpoints/best_urfall_v2mt.pt
+
+# 9) 照片/视频行为判定演示（可解释可视化，答辩演示用）
+python photo_demo.py -d outputs/demo_photos/fall         # 8张跌倒照片
+python photo_demo.py -d 我的测试照片                      # 多组照片（子文件夹=一组）
+python photo_demo.py --video 视频.mp4                    # 视频直接检测（150帧真实时序，最可靠）
 ```
 
 ## 数据集主线（全部开源，9/25 已全部落地）

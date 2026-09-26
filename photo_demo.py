@@ -8,6 +8,8 @@
     python photo_demo.py -p 帧1.jpg 帧2.jpg 帧3.jpg 帧4.jpg 帧5.jpg 帧6.jpg
     # 文件夹内所有图片（按文件名排序）
     python photo_demo.py -d 照片文件夹
+    # 视频直接检测（推荐）：自动抽帧（默认150帧=5秒窗口）→ 判定
+    python photo_demo.py --video 视频.mp4
     # 多组文件夹：目录下有子文件夹时，每个子文件夹=一组，一次全测
     #   我的测试照片/
     #     ├─ 跌倒组/ 1.jpg 2.jpg ...   （该组按文件名排序）
@@ -111,6 +113,40 @@ def visualize(img_path: str, seq: np.ndarray, out_path: str, note: str = ""):
     return out_path
 
 
+def video_to_photos(video_path: str, n: int = 150) -> tuple[str, list[str]]:
+    """视频 → 均匀抽 n 帧存临时目录 → (组名, [照片路径])。
+
+    用 PIL 保存以兼容中文路径；帧写入系统临时目录（英文路径，避开 cv2 中文路径限制）。
+    """
+    import tempfile
+    import cv2
+    from PIL import Image
+    tmpd = os.path.join(tempfile.gettempdir(), "cmta_video_frames")
+    os.makedirs(tmpd, exist_ok=True)
+    for f in os.listdir(tmpd):
+        try:
+            os.remove(os.path.join(tmpd, f))
+        except OSError:
+            pass
+    cap = cv2.VideoCapture(video_path)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total <= 0:
+        cap.release()
+        return Path(video_path).stem, []
+    n = min(n, total)
+    idxs = np.linspace(0, total - 1, n).astype(int)
+    photos = []
+    for i, idx in enumerate(idxs):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(idx))
+        ok, f = cap.read()
+        if ok:
+            tmp = os.path.join(tmpd, f"f{i + 1:03d}.jpg")
+            Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB)).save(tmp)
+            photos.append(tmp)
+    cap.release()
+    return Path(video_path).stem, photos
+
+
 def run_group(engine, yolo, group_name: str, photos: list[str], args, is_multi: bool):
     """单组判定：照片→骨架→模型→输出（含可视化）。"""
     print(f"\n════ 组「{group_name}」：{len(photos)} 张照片 ════")
@@ -162,12 +198,28 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="CMTA-Net 照片行为判定演示")
     ap.add_argument("-p", "--photos", nargs="*", help="照片路径列表（按时间顺序）")
     ap.add_argument("-d", "--dir", help="照片文件夹（有子文件夹=多组，每个子文件夹一组）")
+    ap.add_argument("--video", help="视频路径：直接抽帧判定（推荐，默认抽150帧=5秒窗口）")
+    ap.add_argument("--video-frames", type=int, default=150, help="视频抽帧数（默认150）")
     ap.add_argument("--checkpoint", default=CHECKPOINT)
     ap.add_argument("--tau", type=float, default=0.76, help="行为异常判定阈值（默认0.76=验证集Youden校准值）")
     ap.add_argument("--out", default="outputs/photo_demo.png", help="单组时骨架可视化输出路径")
     args = ap.parse_args()
 
     groups: list[tuple[str, list[str]]] = []
+    if args.video:
+        from ultralytics import YOLO
+        import tempfile
+        print(f"加载 YOLOv8-Pose（首次运行自动下载权重）…")
+        yolo = YOLO("yolov8n-pose.pt")
+        print(f"加载 CMTA-Net 双模态模型（{args.checkpoint}）…")
+        engine = CMTA_Inference(args.checkpoint, tau=args.tau)
+        gname, photos = video_to_photos(args.video, args.video_frames)
+        if not photos:
+            print(f"错误：视频读取失败（{args.video}）")
+            sys.exit(1)
+        print(f"视频「{gname}」：抽 {len(photos)} 帧（{args.video_frames}帧/全程）")
+        r = run_group(engine, yolo, gname, photos, args, is_multi=False)
+        sys.exit(0)
     if args.dir:
         groups = collect_groups(args.dir)
         if not groups:
