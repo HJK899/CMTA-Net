@@ -36,6 +36,9 @@
 
 ## 快速开始（按顺序跑，真实数据管线）
 
+> 图形界面（推荐）：双击 `启动可视化界面.bat` 打开可视化验证平台，8 项验证任务一键操作。
+> 网页版界面预览：<https://hjk899.github.io/CMTA-Net/>
+
 ```bash
 # 0) 安装依赖（venv 已装 torch/ultralytics，其余按需）
 pip install -r requirements.txt
@@ -87,6 +90,7 @@ python photo_demo.py --video 视频.mp4                    # 视频直接检测�
 
 ## 代码仓库与许可
 
+- 网页版可视化界面（GitHub Pages）：<https://hjk899.github.io/CMTA-Net/>
 - 代码：MIT License（见 `LICENSE`）；依赖 ultralytics (YOLOv8) 为 AGPL-3.0（竞赛/研究免费，商业化需企业许可）
 - 数据：4 个开源数据集（UP-Fall / UR Fall / BITS 老年腕戴 / PPG-DaLiA），研究用途许可，引用与 DOI 见 `docs/CITATIONS.md`
 - 复现：`data/raw` 与 `data/features` 不入库（可下载/重建），`checkpoints/` 与 `outputs/` 保留实验产物

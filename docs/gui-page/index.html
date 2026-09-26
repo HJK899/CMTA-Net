@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMTA-Net 可视化验证平台 · 老年人「生理×行为」联合异常识别</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B1424'/%3E%3Cpath d='M12 34h8v14h-8zM28 22h8v26h-8zM44 12h8v36h-8z' fill='%234CC2FF'/%3E%3Ccircle cx='50' cy='14' r='5' fill='%23F5A623'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<style>
+  :root{
+    --bg:#0B1424; --surface:#101D33; --line:#1E3050;
+    --accent:#4CC2FF; --accent-soft:#12344F;
+    --warn:#F5A623; --ok:#3ECF8E;
+    --text:#EAF2FF; --muted:#8FA8CC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:auto}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Noto Sans SC",system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    line-height:1.7; letter-spacing:.01em;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+  a{color:var(--accent);text-decoration:none}
+
+  /* Header */
+  header{
+    border-bottom:1px solid var(--line); background:rgba(11,20,36,.85);
+    position:sticky; top:0; z-index:10; backdrop-filter:blur(8px);
+  }
+  .bar{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+  .brand .dot{width:10px;height:10px;border-radius:3px;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+  .gh-link{
+    display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:8px;
+    border:1px solid var(--line); font-size:14px; color:var(--text);
+    transition:border-color .2s, background .2s;
+  }
+  .gh-link:hover{border-color:var(--accent);background:var(--accent-soft)}
+
+  /* Hero */
+  .hero{padding:72px 0 40px;text-align:center}
+  .hero .kicker{
+    display:inline-block;font-size:13px;color:var(--accent);letter-spacing:.18em;
+    border:1px solid var(--line);border-radius:999px;padding:6px 16px;margin-bottom:22px;
+    background:var(--accent-soft);
+  }
+  .hero h1{font-size:clamp(34px,6vw,56px);font-weight:900;line-height:1.15;letter-spacing:-.01em}
+  .hero .sub{color:var(--muted);font-size:17px;max-width:680px;margin:18px auto 0}
+  .hero .sub b{color:var(--text);font-weight:500}
+
+  /* Metrics */
+  .metrics{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+    max-width:760px;margin:36px auto 0;
+  }
+  .m{
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:18px 10px;text-align:center;
+  }
+  .m .v{font-size:26px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums}
+  .m .v.warn{color:var(--warn)}
+  .m .l{font-size:13px;color:var(--muted);margin-top:4px}
+
+  /* Screenshot */
+  .shot{margin-top:44px}
+  .shot img{
+    width:100%;border-radius:14px;border:1px solid var(--line);
+    box-shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+  .shot figcaption{font-size:13px;color:var(--muted);margin-top:12px;text-align:center}
+
+  /* Section */
+  section{padding:64px 0}
+  .sec-title{font-size:26px;font-weight:900;margin-bottom:8px}
+  .sec-sub{color:var(--muted);font-size:14px;margin-bottom:32px}
+  .divider{height:1px;background:var(--line);margin:0 24px}
+
+  /* Tasks list */
+  .tasks{display:grid;grid-template-columns:1fr;gap:0}
+  .task{
+    display:grid;grid-template-columns:72px 1fr;gap:20px;align-items:baseline;
+    padding:18px 6px;border-bottom:1px solid var(--line);
+  }
+  .task:last-child{border-bottom:none}
+  .task .no{
+    font-size:15px;font-weight:900;color:var(--accent);
+    font-variant-numeric:tabular-nums;font-family:ui-monospace,Consolas,monospace;
+  }
+  .task .tname{font-size:16px;font-weight:700}
+  .task .tdesc{font-size:14px;color:var(--muted);margin-top:2px}
+
+  /* Effects */
+  .effects{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .ef{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .ef img{width:100%;display:block;max-height:520px;object-fit:contain;background:var(--surface)}
+  .ef .cap{padding:14px 18px}
+  .ef .cap b{font-size:15px}
+  .ef .cap p{font-size:13px;color:var(--muted);margin-top:2px}
+
+  /* Code */
+  .code{
+    background:#081120;border:1px solid var(--line);border-radius:12px;
+    padding:20px 22px;font-family:ui-monospace,Consolas,"Courier New",monospace;
+    font-size:13.5px;line-height:1.9;color:#BFD9FF;overflow-x:auto;
+  }
+  .code .c{color:var(--muted)}
+  .code .ok{color:var(--ok)}
+  .code .w{color:var(--warn)}
+
+  /* Data table */
+  table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px}
+  colgroup col:nth-child(1){width:22%} col:nth-child(2){width:46%} col:nth-child(3){width:32%}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--accent);font-size:13px;letter-spacing:.05em;font-weight:700}
+  td{color:var(--text)}
+  td .muted{color:var(--muted);font-size:13px}
+
+  /* Footer */
+  footer{
+    border-top:1px solid var(--line);padding:34px 0 44px;text-align:center;
+    color:var(--muted);font-size:13px;
+  }
+  footer .cta{
+    display:inline-flex;align-items:center;gap:8px;padding:12px 26px;border-radius:10px;
+    background:var(--accent);color:#04121F;font-weight:700;font-size:15px;margin-bottom:20px;
+  }
+  footer .cta:hover{background:#79D4FF}
+
+  @media (max-width:720px){
+    .metrics{grid-template-columns:1fr;gap:10px}
+    .effects{grid-template-columns:1fr}
+    .task{grid-template-columns:48px 1fr;gap:12px}
+    .bar .gh-link span.hide{display:none}
+    section{padding:48px 0}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <div class="brand"><span class="dot"></span>CMTA-Net · 可视化验证平台</div>
+    <a class="gh-link" href="https://github.com/HJK899/CMTA-Net" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      <span class="hide">GitHub 仓库</span>
+    </a>
+  </div>
+</header>
+
+<main>
+  <!-- ===== Hero ===== -->
+  <section class="hero">
+    <div class="wrap">
+      <span class="kicker">算法模型创新赛道 · 竞赛作品</span>
+      <h1>CMTA-Net<br>跨模态时空注意力融合网络</h1>
+      <p class="sub">面向独居老人监护场景，联合<b>可穿戴生理信号</b>与<b>视频骨架行为</b>双模态，完成跌倒与异常行为的<b>实时识别</b>，全程可解释可视化验证。</p>
+      <div class="metrics">
+        <div class="m"><div class="v">0.9500</div><div class="l">测试集 F1（4名未见受试者）</div></div>
+        <div class="m"><div class="v">0.9372 ± 0.011</div><div class="l">三随机种子均值 F1</div></div>
+        <div class="m"><div class="v warn">0.9842 ± 0.002</div><div class="l">ROC AUC</div></div>
+      </div>
+      <figure class="shot">
+        <img src="assets/gui.png" alt="CMTA-Net 可视化验证平台界面截图">
+        <figcaption>本地一键启动的可视化验证界面：8 项验证任务、实时日志、指标卡片与结果图预览</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== 8 Tasks ===== -->
+  <section>
+    <div class="wrap">
+      <h2 class="sec-title">八项验证任务，一次点击</h2>
+      <p class="sec-sub">从端到端评估到可解释推理演示，覆盖"训练 → 评估 → 诊断 → 推理 → 部署 → 演示"全链路</p>
+      <div class="tasks">
+        <div class="task"><div class="no">01</div><div><div class="tname">评估主模型（快）</div><div class="tdesc">UP-Fall 16 通道传感流 · 测试集 = 4 名未见受试者，加载已训练模型直接评估</div></div></div>
+        <div class="task"><div class="no">02</div><div><div class="tname">完整复现（重训 + 评估）</div><div class="tdesc">从头训练新随机种子，验证全链路真实可复现（约 5 分钟）</div></div></div>
+        <div class="task"><div class="no">03</div><div><div class="tname">双模态四态诊断（UR Fall）</div><div class="tdesc">视频骨架 × 加速度传感 · 四态 + 模态一致性分数</div></div></div>
+        <div class="task"><div class="no">04</div><div><div class="tname">推理接口演示</div><div class="tdesc">单窗口 → 四态诊断 + 各模态概率 + 一致性输出</div></div></div>
+        <div class="task"><div class="no">05</div><div><div class="tname">边缘部署时延评测</div><div class="tdesc">CPU 单窗口推理毫秒级 · 参数量统计</div></div></div>
+        <div class="task"><div class="no">06</div><div><div class="tname">照片判定演示（跌倒 vs 日常）</div><div class="tdesc">真实照片 → YOLOv8-Pose 骨架 → 行为判定 · 可视化对比</div></div></div>
+        <div class="task"><div class="no">07</div><div><div class="tname">测试我的照片</div><div class="tdesc">判定「我的测试照片」文件夹 · 子文件夹 = 一组，一次全测</div></div></div>
+        <div class="task"><div class="no">08</div><div><div class="tname">视频检测演示（跨库户外）</div><div class="tdesc">户外跌倒视频直接检测 · 150 帧真实时序（实测 0.78 / 0.84 检出）</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== Effects ===== -->
+  <section>
+    <div class="wrap">
+      <h2 class="sec-title">可解释判定效果</h2>
+      <p class="sec-sub">骨架可视化让模型"看得见"：姿态关键点、行为异常概率与四态诊断逐帧呈现</p>
+      <div class="effects">
+        <figure class="ef">
+          <img src="assets/demo.jpg" alt="视频行为判定骨架可视化">
+          <figcaption class="cap"><b>视频行为判定</b><p>户外雪地跌倒视频，150 帧真实时序 → 行为异常概率 0.78，判定异常并告警</p></figcaption>
+        </figure>
+        <figure class="ef">
+          <img src="assets/demo_photos.jpg" alt="我的测试照片多组判定">
+          <figcaption class="cap"><b>我的照片 · 多组判定</b><p>子文件夹 = 一组，批量判定户外跌倒 / 趴地 / 日常活动三组照片</p></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== Quick start ===== -->
+  <section>
+    <div class="wrap">
+      <h2 class="sec-title">快速开始</h2>
+      <p class="sec-sub">模型、代码、数据集引用规范均已开源在 GitHub 仓库</p>
+      <pre class="code"><span class="c"># 方式一：Windows 双击入口</span>
+<span class="ok">启动可视化界面.bat</span>   <span class="c"># 自动打开图形界面（任务 01-08）</span>
+
+<span class="c"># 方式二：命令行</span>
+python gui_verify.py                 <span class="c"># 图形验证平台</span>
+python photo_demo.py -d 我的测试照片  <span class="c"># 多组照片判定</span>
+python photo_demo.py --video 视频.mp4 <span class="c"># 视频直接检测（150帧，最可靠）</span>
+python evaluate.py --checkpoint checkpoints/best_upfall_v2h.pt --dataset upfall --stream physio --split test
+
+<span class="c"># 依赖环境：Python 3.13 · PyTorch · ultralytics(YOLOv8-Pose) · 全程 CPU 可运行</span></pre>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ===== Data ===== -->
+  <section>
+    <div class="wrap">
+      <h2 class="sec-title">数据主线（全部开源可复现）</h2>
+      <p class="sec-sub">四套公开数据集构成"传感 × 行为"双模态证据链，训练/验证/测试按受试者严格划分防泄漏</p>
+      <table>
+        <colgroup><col><col><col></colgroup>
+        <thead><tr><th>数据集</th><th>内容</th><th>在本作品中的角色</th></tr></thead>
+        <tbody>
+          <tr><td>UP-Fall</td><td>17 人、11 类活动（5 跌倒 + 6 日常），EEG + 5 处穿戴 IMU + 红外</td><td>传感流规模训练（按人 6:2:2）</td></tr>
+          <tr><td>UR Fall</td><td>70 段（30 跌倒 + 40 日常）视频 + 配对加速度 CSV</td><td>双模态联合主阵地（视频→骨架 × 传感）</td></tr>
+          <tr><td>老年腕戴</td><td>41 名真实老人，984 段，三轴加速度 + 1Hz 真实心率</td><td>真实老人数据（含 HR），可分性挑战样本</td></tr>
+          <tr><td>PPG-DaLiA（镜像）</td><td>495 万条 8 秒 PPG 窗口，心率回归标签</td><td>PPG → 心率附加素材</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="cta" href="https://github.com/HJK899/CMTA-Net" target="_blank" rel="noopener">在 GitHub 查看完整代码仓库</a>
+    <p>CMTA-Net · 算法模型创新竞赛作品 · 老年人「生理 × 行为」联合异常识别</p>
+    <p>代码 MIT License · 数据集引用规范见 docs/CITATIONS.md</p>
+  </div>
+</footer>
+
+</body>
+</html>
