@@ -46,11 +46,9 @@ TASKS = {
                   "--split", "test", "--out", "outputs/verify_gui_r2"]],
     },
     "3": {
-        "name": "双模态四态诊断（UR Fall）",
-        "desc": "骨架×加速度 · 四态 + 一致性分数",
-        "cmds": [["evaluate.py", "--checkpoint", "checkpoints/best_urfall_v2mt.pt",
-                  "--dataset", "urfall", "--stream", "both",
-                  "--split", "test", "--out", "outputs/verify_gui_mt"]],
+        "name": "双模态四态诊断（演示）",
+        "desc": "真实视频骨架×真实传感窗口·四态+一致性（UR Fall官方源失效，指标见技术报告）",
+        "cmds": [["urfall_demo.py"]],
     },
     "4": {
         "name": "推理接口演示",
