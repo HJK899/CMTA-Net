@@ -98,8 +98,19 @@ class CMTA_Inference:
             state = 3 if (p1 >= self.tau and b1 >= self.tau) else \
                     (1 if p1 >= self.tau else (2 if b1 >= self.tau else 0))
             conf = max(p1, b1) if state in (1, 2) else (min(p1, b1) if state == 0 else min(p1, b1))
+        elif physio is None and behavior is not None:
+            # 行为单流（如照片→骨架序列）：行为诊断头
+            state = 2 if (prob or 0.0) >= self.tau else 0
+            prob_b = prob
+            conf = prob
+        elif behavior is None and physio is not None:
+            # 生理单流（如穿戴传感窗口）：生理诊断头
+            state = 1 if (prob or 0.0) >= self.tau else 0
+            prob_p = prob
+            conf = prob
         else:
-            state = 1 if (prob or 0.0) >= self.tau else 0     # 无四态头 → 退化为异常/正常
+            # 无四态头的双模态：融合头退化（异常/正常）
+            state = 1 if (prob or 0.0) >= self.tau else 0
             conf = prob
 
         return {
