@@ -90,6 +90,7 @@ def main() -> None:
     ap.add_argument("-d", "--dir", help="照片文件夹（按文件名排序）")
     ap.add_argument("--checkpoint", default=CHECKPOINT)
     ap.add_argument("--tau", type=float, default=0.76, help="行为异常判定阈值（默认0.76=验证集Youden校准值）")
+    ap.add_argument("--out", default="outputs/photo_demo.png", help="骨架可视化输出路径")
     args = ap.parse_args()
 
     photos: list[str] = []
@@ -144,7 +145,7 @@ def main() -> None:
 
     # 4) 骨架可视化（画在最后一张照片上）
     note = f"行为异常概率={res['行为异常概率'] or 0:.2f} · {res['state_name']}"
-    out = visualize(photos[-1], seq_arr, os.path.join(BASE, "outputs", "photo_demo.png"), note)
+    out = visualize(photos[-1], seq_arr, os.path.join(BASE, args.out), note)
     if out:
         print(f"\n骨架可视化已保存: {out}")
 

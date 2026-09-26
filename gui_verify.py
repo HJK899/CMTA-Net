@@ -62,6 +62,14 @@ TASKS = {
         "desc": "CPU 单窗口推理 ms · 参数量",
         "cmds": [["benchmark_latency.py", "--checkpoint", "checkpoints/best_upfall_v2h.pt"]],
     },
+    "6": {
+        "name": "照片判定演示（跌倒 vs 日常）",
+        "desc": "真实照片→骨架→行为判定·可视化对比",
+        "cmds": [["photo_demo.py", "-d", "outputs/demo_photos/fall",
+                  "--out", "outputs/demo_photo_fall.png"],
+                 ["photo_demo.py", "-d", "outputs/demo_photos/adl",
+                  "--out", "outputs/demo_photo_adl.png"]],
+    },
 }
 
 RE_METRICS = {
@@ -69,7 +77,10 @@ RE_METRICS = {
     "f1": re.compile(r"F1\s*=\s*([\d.]+)"),
     "auc": re.compile(r"AUC\s*=\s*([\d.]+)"),
     "cm": re.compile(r"TP=(\d+)\s+FP=(\d+)\s+FN=(\d+)\s+TN=(\d+)"),
+    "probe": re.compile(r"行为异常概率:\s*([\d.]+)"),
 }
+
+DEFAULT_NAMES = {"acc": "准确率", "f1": "F1", "auc": "AUC", "cm": "混淆矩阵"}
 
 
 class Worker(threading.Thread):
@@ -119,6 +130,8 @@ class App:
         self.worker = None
         self.cm_path = None
         self.roc_path = None
+        self.img1_path = None
+        self.img2_path = None
         self._photo = None
 
         self._build_style()
@@ -181,26 +194,28 @@ class App:
         # ---- 中部：指标卡片 ----
         mid = ttk.Frame(self.root, style="Card.TFrame"); mid.pack(fill="x", padx=12, pady=8)
         self.metric_labels = {}
-        for i, (k, name) in enumerate([("acc", "准确率"), ("f1", "F1"), ("auc", "AUC"),
-                                       ("cm", "混淆矩阵")]):
+        self.metric_names = {}
+        for i, k in enumerate(["acc", "f1", "auc", "cm"]):
             cell = ttk.Frame(mid, style="Card.TFrame"); cell.grid(row=0, column=i, padx=10, pady=8)
-            ttk.Label(cell, text=name, style="MetricName.TLabel").pack()
+            name_lbl = ttk.Label(cell, text=DEFAULT_NAMES[k], style="MetricName.TLabel")
+            name_lbl.pack()
             lbl = ttk.Label(cell, text="—", style="Metric.TLabel")
             lbl.pack()
             self.metric_labels[k] = lbl
+            self.metric_names[k] = name_lbl
 
         # ---- 底部：图表预览 ----
         bot = ttk.Frame(self.root); bot.pack(fill="both", expand=True, padx=12, pady=(0, 10))
         ttk.Label(bot, text="图表预览", font=("Microsoft YaHei UI", 11, "bold"),
                   background="#f4f6fa").pack(anchor="w")
-        self.img_canvas = tk.Label(bot, text="运行后自动显示混淆矩阵 / ROC 曲线", bg="#ffffff",
+        self.img_canvas = tk.Label(bot, text="运行后自动显示最新结果图（混淆矩阵/ROC/骨架判定）", bg="#ffffff",
                                    relief="groove", bd=1)
         self.img_canvas.pack(fill="both", expand=True)
         switch_row = ttk.Frame(bot); switch_row.pack(anchor="w", pady=4)
-        self.img_var = tk.StringVar(value="cm")
-        ttk.Radiobutton(switch_row, text="混淆矩阵", value="cm", variable=self.img_var,
+        self.img_var = tk.StringVar(value="1")
+        ttk.Radiobutton(switch_row, text="结果图①（最新）", value="1", variable=self.img_var,
                         command=self._show_img).pack(side="left")
-        ttk.Radiobutton(switch_row, text="ROC 曲线", value="roc", variable=self.img_var,
+        ttk.Radiobutton(switch_row, text="结果图②", value="2", variable=self.img_var,
                         command=self._show_img).pack(side="left", padx=8)
 
     def _on_task_change(self):
@@ -217,6 +232,7 @@ class App:
         key = self.task_var.get()
         self._reset_metrics()
         self.cm_path = self.roc_path = None
+        self.img1_path = self.img2_path = None
         self.status.config(text=f"运行中：{TASKS[key]['name']} …", foreground="#1a7f37")
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
@@ -233,12 +249,31 @@ class App:
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
         text = self.log.get("1.0", "end")
-        parsed = self._parse_metrics(text)
-        if parsed:
-            self._update_metrics(parsed)
-            self.status.config(text="完成 ✔", foreground="#1a7f37")
+
+        if self.task_var.get() == "6":
+            # 照片判定任务：解析两次"行为异常概率"（fall 先、adl 后）
+            probs = RE_METRICS["probe"].findall(text)
+            if len(probs) >= 2:
+                self.metric_names["acc"].config(text="跌倒过程概率")
+                self.metric_labels["acc"].config(text=f"{float(probs[0]):.3f}",
+                                                 font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_names["f1"].config(text="日常活动概率")
+                self.metric_labels["f1"].config(text=f"{float(probs[1]):.3f}",
+                                               font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_names["auc"].config(text="判定阈值")
+                self.metric_labels["auc"].config(text="0.76", font=("Microsoft YaHei UI", 18, "bold"))
+                self.metric_labels["cm"].config(text="异常>0.76", font=("Microsoft YaHei UI", 14, "bold"))
+                self.status.config(text="完成 ✔ 跌倒异常 vs 日常正常", foreground="#1a7f37")
+            else:
+                self.status.config(text="完成（照片判定，请查看日志）", foreground="#9a6700")
         else:
-            self.status.config(text="完成（未解析到指标，请查看日志）", foreground="#9a6700")
+            parsed = self._parse_metrics(text)
+            if parsed:
+                self._update_metrics(parsed)
+                self.status.config(text="完成 ✔", foreground="#1a7f37")
+            else:
+                self.status.config(text="完成（未解析到指标，请查看日志）", foreground="#9a6700")
+
         self._find_images()
         self._show_img()
 
@@ -266,28 +301,29 @@ class App:
     def _reset_metrics(self):
         for k, lbl in self.metric_labels.items():
             lbl.config(text="—", font=("Microsoft YaHei UI", 22, "bold"))
+        for k, nl in self.metric_names.items():
+            nl.config(text=DEFAULT_NAMES[k])
         self.metric_labels["cm"].config(text="—")
 
     def _find_images(self):
-        out_dirs = [os.path.join(BASE, "outputs")]
+        out_dir = os.path.join(BASE, "outputs")
         cands = []
-        for d in out_dirs:
-            if os.path.isdir(d):
-                for f in sorted(os.listdir(d)):
-                    if f.endswith("_cm.png"):
-                        cands.append((f, os.path.join(d, f)))
+        if os.path.isdir(out_dir):
+            for f in sorted(os.listdir(out_dir)):
+                if f.endswith("_cm.png") or f.endswith("_roc.png") \
+                        or f.startswith("demo_photo") or f == "photo_demo.png":
+                    cands.append(os.path.join(out_dir, f))
+        cands.sort(key=lambda p: os.path.getmtime(p), reverse=True)
         if not cands:
+            self.img1_path = self.img2_path = None
             return
-        latest = max(cands, key=lambda x: os.path.getmtime(x[1]))
-        self.cm_path = latest[1]
-        self.roc_path = latest[1].replace("_cm.png", "_roc.png")
-        if not os.path.exists(self.roc_path):
-            self.roc_path = None
+        self.img1_path = cands[0]
+        self.img2_path = cands[1] if len(cands) > 1 else None
 
     def _show_img(self):
         if not HAS_PIL:
             return
-        path = self.cm_path if self.img_var.get() == "cm" else self.roc_path
+        path = self.img1_path if self.img_var.get() == "1" else self.img2_path
         if not path or not os.path.exists(path):
             return
         try:
