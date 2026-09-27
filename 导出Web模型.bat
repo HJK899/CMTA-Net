@@ -6,7 +6,7 @@ echo  Output folder: web-onnx\models\
 echo  Requires: D:\PyTorch\venv (torch + ultralytics)
 echo ============================================
 if exist "D:\PyTorch\venv\Scripts\python.exe" (
-    "D:\PyTorch\venv\Scripts\python.exe" -m pip install --quiet onnx onnxruntime
+    "D:\PyTorch\venv\Scripts\python.exe" -m pip install --quiet onnx onnxscript onnxruntime
     "D:\PyTorch\venv\Scripts\python.exe" export_onnx.py
 ) else (
     echo [ERROR] Python venv not found: D:\PyTorch\venv
