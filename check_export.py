@@ -28,6 +28,11 @@ def main() -> None:
     engine = CMTA_Inference("checkpoints/best_urfall_v2mt.pt")
     sess = ort.InferenceSession("web-onnx/models/cmta.onnx", providers=["CPUExecutionProvider"])
 
+    # —— 关键点参照：打印 ultralytics 对"日常活动组/1.jpg"的关键点数值 ——
+    ref = extract_pose(yolo, os.path.join("我的测试照片", "日常活动组", "1.jpg"))
+    print("[参照] ultralytics 日常活动组/1.jpg 关键点(前9值):",
+          np.round(ref.reshape(-1)[:9], 4).tolist() if ref is not None else None)
+
     for group in ["户外趴地组", "户外跌倒组", "日常活动组"]:
         files = sorted(glob.glob(os.path.join("我的测试照片", group, "*.jpg")))
         if not files:
