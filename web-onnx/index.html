@@ -59,8 +59,17 @@
       并按时间顺序命名（1.jpg、2.jpg…）。模型加载需 10-30 秒（首次），推理逐张进行。</div>
   </div>
 
+  <div class="card">
+    <h2>2. 上传视频（可选 · 替代照片序列）</h2>
+    <div class="drop" id="vdrop"><div id="vdropText">点击选择视频，或拖拽到此处</div></div>
+    <input type="file" id="vfile" accept="video/*">
+    <div style="text-align:center"><button class="btn" id="vgo" disabled>开始检测</button></div>
+    <div class="hint">浏览器本地解码视频、均匀抽取 8 帧送入模型，全程不上传服务器。
+      支持 mp4 / webm / mov 等常见格式；建议视频中包含"站立→倒地"等完整动作过程。</div>
+  </div>
+
   <div class="card res" id="resCard">
-    <h2>2. 检测结果</h2>
+    <h2>3. 检测结果</h2>
     <div class="state" id="state">…</div>
     <div class="bar"><i id="bar" style="width:0%"></i></div>
     <div class="probe"><span>行为异常概率</span><b id="prob">–</b></div>
@@ -82,7 +91,9 @@ const STATE_NAMES = {0:'正常', 1:'生理异常', 2:'行为异常', 3:'联合�
 
 const drop = document.getElementById('drop'), file = document.getElementById('file'),
       go = document.getElementById('go'), dropText = document.getElementById('dropText');
-let chosen = [];
+const vdrop = document.getElementById('vdrop'), vfile = document.getElementById('vfile'),
+      vgo = document.getElementById('vgo'), vdropText = document.getElementById('vdropText');
+let chosen = [], vFile = null;
 drop.onclick = () => file.click();
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('on'); };
 drop.ondragleave = () => drop.classList.remove('on');
@@ -95,6 +106,17 @@ function onChange() {
     ? '已选择 ' + chosen.length + ' 张照片：' + chosen.map(f => f.name).join(', ')
     : '点击选择照片';
   go.disabled = !chosen.length;
+}
+vdrop.onclick = () => vfile.click();
+vdrop.ondragover = e => { e.preventDefault(); vdrop.classList.add('on'); };
+vdrop.ondragleave = () => vdrop.classList.remove('on');
+vdrop.ondrop = e => { e.preventDefault(); vdrop.classList.remove('on');
+  if (e.dataTransfer.files.length) vfile.files = e.dataTransfer.files; onVChange(); };
+vfile.onchange = onVChange;
+function onVChange() {
+  vFile = vfile.files[0] || null;
+  vdropText.textContent = vFile ? '已选择：' + vFile.name : '点击选择视频';
+  vgo.disabled = !vFile;
 }
 
 let yolo = null, cmta = null;
@@ -205,8 +227,56 @@ go.onclick = async () => {
     seq.push(kp ? kp.flat() : new Array(NUM_KP).fill(0));
     URL.revokeObjectURL(url);
   }
+  await runInference(seq, img);
+  go.disabled = false; go.textContent = '开始检测';
+};
+
+// —— 视频推理：本地解码 → 均匀抽帧 → 骨架 → 行为判定 ——
+const VID_FRAMES = 8;
+async function decodeVideoFrames(videoFile) {
+  const url = URL.createObjectURL(videoFile);
+  const v = document.createElement('video');
+  v.src = url; v.muted = true; v.playsInline = true;
+  await new Promise((res, rej) => { v.onloadedmetadata = res; v.onerror = () => rej(new Error('视频解码失败')); });
+  const dur = v.duration;
+  if (!(dur > 0) || !v.videoWidth) throw new Error('无法读取视频内容，请换一个文件');
+  const frames = [];
+  for (let i = 0; i < VID_FRAMES; i++) {
+    v.currentTime = Math.min(dur - 0.05, (i / (VID_FRAMES - 1)) * dur);
+    await new Promise(res => { v.onseeked = res; });
+    const cv = document.createElement('canvas');
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v, 0, 0);
+    frames.push(cv);
+    log('抽帧 ' + (i + 1) + '/' + VID_FRAMES);
+  }
+  URL.revokeObjectURL(url);
+  return frames;
+}
+
+vgo.onclick = async () => {
+  if (!vFile) return;
+  if (!yolo) await loadModels();
+  vgo.disabled = true; vgo.textContent = '检测中…';
+  try {
+    const frames = await decodeVideoFrames(vFile);
+    const seq = [];
+    for (let i = 0; i < frames.length; i++) {
+      const kp = await extractKp(frames[i]);
+      seq.push(kp ? kp.flat() : new Array(NUM_KP).fill(0));
+      log('骨架提取 ' + (i + 1) + '/' + VID_FRAMES);
+    }
+    await runInference(seq, frames[frames.length - 1]);
+  } catch (e) {
+    log('视频处理失败：' + e.message);
+    alert('视频处理失败：' + e.message);
+  }
+  vgo.disabled = false; vgo.textContent = '开始检测';
+};
+
+async function runInference(seq, lastEl) {
   const valid = seq.filter(r => r.some(v => v !== 0)).length;
-  if (valid === 0) { alert('所有照片均未检测到人体'); go.disabled = false; go.textContent = '开始检测'; return; }
+  if (valid === 0) { alert('未检测到人体骨架'); return; }
   const win = linearResample(seq, WIN_BEH);
   const data = new Float32Array(win.length * NUM_KP);
   win.forEach((row, t) => row.forEach((v, c) => data[t * NUM_KP + c] = v / 100));
@@ -215,11 +285,10 @@ go.onclick = async () => {
   const logits = Array.from(res.logits.data);
   const p1 = Math.exp(logits[1]) / (Math.exp(logits[0]) + Math.exp(logits[1]));
   const state = p1 >= TAU ? 2 : 0;
-  render(state, p1, valid, seq, chosen[chosen.length - 1]);
-  go.disabled = false; go.textContent = '开始检测';
-};
+  render(state, p1, valid, seq, lastEl);
+}
 
-function render(state, p1, valid, seq, lastFile) {
+function render(state, p1, valid, seq, lastEl) {
   const cls = 'st' + state;
   document.getElementById('state').className = 'state ' + cls;
   document.getElementById('state').textContent = STATE_NAMES[state] + (state === 2 ? '（触发告警）' : '');
@@ -232,16 +301,10 @@ function render(state, p1, valid, seq, lastFile) {
   document.getElementById('resCard').style.display = 'block';
   const imgBox = document.getElementById('imgBox');
   imgBox.innerHTML = '';
-  const url = URL.createObjectURL(lastFile);
-  const img = new Image();
-  img.onload = () => {
-    const lastKp = seq[seq.length - 1].map((v, i) => [seq[seq.length-1][i*3], seq[seq.length-1][i*3+1], seq[seq.length-1][i*3+2]]);
-    const kpArr = [];
-    for (let j = 0; j < 17; j++) kpArr.push([lastKp[j][0], lastKp[j][1], lastKp[j][2]]);
-    imgBox.appendChild(drawSkeleton(img, kpArr));
-    URL.revokeObjectURL(url);
-  };
-  img.src = url;
+  const last = seq[seq.length - 1];
+  const kpArr = [];
+  for (let j = 0; j < 17; j++) kpArr.push([last[j * 3], last[j * 3 + 1], last[j * 3 + 2]]);
+  imgBox.appendChild(drawSkeleton(lastEl, kpArr));
 }
 
 function log(t) { document.getElementById('log').textContent = t; }
